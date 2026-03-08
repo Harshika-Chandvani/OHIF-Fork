@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { DicomMetadataStore } from '@ohif/core';
 import { ecgToolState } from '../ecgToolState';
-import { hrBus, rectBus } from '../hrBus';
+import { hrBus, rectBus, qrsBus } from '../hrBus';
 
 const LEAD_NAMES = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
 
@@ -628,6 +628,151 @@ function ActiveRectPreview({
   );
 }
 
+// ─── QRS Axis Measurement Types ────────────────────────────────────────────────
+
+interface QRSAxisMeasurement {
+  id: number;
+  x1: number;
+  x2: number;
+  axisDeg: number;
+}
+
+interface ActiveQRSAxisState {
+  x1: number;
+  cursorX: number;
+}
+
+function QRSAxisMeasurementShape({
+  m,
+  svgH,
+  leads,
+  cols,
+  leadW,
+  leadH,
+}: {
+  m: QRSAxisMeasurement;
+  svgH: number;
+  leads: any[];
+  cols: number;
+  leadW: number;
+  leadH: number;
+}) {
+  const { x1, x2, axisDeg } = m;
+  const labelText = `${axisDeg.toFixed(2)}°`;
+  const labelWidth = labelText.length * 8 + 12;
+
+  const iIndex = leads?.findIndex(l => l.name === 'I');
+  const aVFIndex = leads?.findIndex(l => l.name === 'aVF');
+
+  return (
+    <g>
+      <line
+        x1={x1}
+        y1={0}
+        x2={x1}
+        y2={svgH}
+        stroke="#aaddff"
+        strokeWidth={1}
+      />
+      <line
+        x1={x2}
+        y1={0}
+        x2={x2}
+        y2={svgH}
+        stroke="#aaddff"
+        strokeWidth={1}
+      />
+
+      {[iIndex, aVFIndex].map(idx => {
+        if (idx === undefined || idx < 0) return null;
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        const ry = row * leadH;
+
+        // Calculate local coordinates relative to the clicked column
+        const clickCol = Math.floor(Math.min(x1, x2) / leadW);
+        const localX1 = Math.min(x1, x2) - clickCol * leadW;
+        const widthPx = Math.abs(x2 - x1);
+
+        // Transform the local X into the visual column of THIS lead
+        const boxX = col * leadW + localX1;
+
+        return (
+          <rect
+            key={idx}
+            x={boxX}
+            y={ry}
+            width={widthPx}
+            height={leadH}
+            fill="#ff555522"
+            stroke="#ff555544"
+            strokeWidth={1}
+          />
+        );
+      })}
+
+      <rect
+        x={Math.max(x1, x2) + 4}
+        y={svgH / 2 - 12}
+        width={labelWidth}
+        height={24}
+        rx={4}
+        fill="#0a0e1add"
+        stroke="#ff775544"
+        strokeWidth={1}
+      />
+      <text
+        x={Math.max(x1, x2) + 4 + labelWidth / 2}
+        y={svgH / 2 + 4}
+        textAnchor="middle"
+        fill="#ffbb88"
+        fontSize={12}
+        fontFamily="monospace"
+        fontWeight="bold"
+      >
+        {labelText}
+      </text>
+    </g>
+  );
+}
+
+function ActiveQRSPreview({ state, svgH }: { state: ActiveQRSAxisState; svgH: number }) {
+  const { x1, cursorX } = state;
+  const minX = Math.min(x1, cursorX);
+  const maxX = Math.max(x1, cursorX);
+
+  return (
+    <g opacity={0.7}>
+      <line
+        x1={x1}
+        y1={0}
+        x2={x1}
+        y2={svgH}
+        stroke="#aaddff"
+        strokeWidth={1}
+        strokeDasharray="3 3"
+      />
+      <line
+        x1={cursorX}
+        y1={0}
+        x2={cursorX}
+        y2={svgH}
+        stroke="#aaddff"
+        strokeWidth={1}
+        strokeDasharray="3 3"
+      />
+      <rect
+        x={minX}
+        y={0}
+        width={maxX - minX}
+        height={svgH}
+        fill="#ff555511"
+        stroke="none"
+      />
+    </g>
+  );
+}
+
 // ─── HR Measurement Types ─────────────────────────────────────────────────────
 
 interface HRMeasurement {
@@ -802,6 +947,8 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
   const [activeHR, setActiveHR] = useState<ActiveHRState | null>(null);
   const [rectMeasurements, setRectMeasurements] = useState<RectMeasurement[]>([]);
   const [activeRect, setActiveRect] = useState<ActiveRectState | null>(null);
+  const [qrsMeasurements, setQrsMeasurements] = useState<QRSAxisMeasurement[]>([]);
+  const [activeQRS, setActiveQRS] = useState<ActiveQRSAxisState | null>(null);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<SVGSVGElement>(null);
@@ -814,7 +961,9 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
       // Clear in-progress states when switching tools
       setActiveQT(null);
       setActiveHR(null);
+      setActiveHR(null);
       setActiveRect(null);
+      setActiveQRS(null);
     });
     // Initialize with current tool
     setActiveTool(ecgToolState.getActiveTool());
@@ -1010,6 +1159,62 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
     [activeRect, getCoords, pixelToSec, pixelToMv, dimensions.height, error]
   );
 
+  // ── QRS Axis Click Handler ───────────────────────────────────────────────
+  const handleQRSClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 0) return;
+      const x = getXCoord(e);
+
+      if (!activeQRS) {
+        setActiveQRS({ x1: x, cursorX: x });
+      } else {
+        const x1 = activeQRS.x1;
+        const x2 = x;
+        const sortedX1 = Math.min(x1, x2);
+        const sortedX2 = Math.max(x1, x2);
+
+        let axisDeg = 0;
+        if (leads?.length) {
+          const numLeads = leads.length;
+          const cols = numLeads >= 12 ? 4 : numLeads >= 6 ? 2 : 1;
+          const leadW = dimensions.width / cols;
+
+          // Determine column and map X to local sample index
+          const colX = Math.floor(sortedX1 / leadW);
+          const localX1 = sortedX1 - colX * leadW;
+          const localX2 = sortedX2 - colX * leadW; // We assume x2 is in the same col
+
+          const totalSamples = leads[0]?.samplesPerChannel || 5000;
+          const startIndex = Math.max(0, Math.floor((localX1 / leadW) * totalSamples));
+          const endIndex = Math.min(totalSamples - 1, Math.ceil((localX2 / leadW) * totalSamples));
+
+          const iLead = leads.find(l => l.name === 'I') || leads[0];
+          const aVFLead = leads.find(l => l.name === 'aVF') || leads[5] || leads[0];
+
+          const iData = iLead.data.slice(startIndex, endIndex + 1);
+          const aVFData = aVFLead.data.slice(startIndex, endIndex + 1);
+
+          const maxI = iData.length ? Math.max(...iData) : 0;
+          const minI = iData.length ? Math.min(...iData) : 0;
+          const maxaVF = aVFData.length ? Math.max(...aVFData) : 0;
+          const minaVF = aVFData.length ? Math.min(...aVFData) : 0;
+
+          const netI = maxI + minI;
+          const netaVF = maxaVF + minaVF;
+
+          // Medical positive aVF points down (+90 degrees), standard atan2 natively maps this correctly.
+          axisDeg = Math.atan2(netaVF, netI) * (180 / Math.PI);
+        }
+
+        const newId = ++measureId;
+        setQrsMeasurements(prev => [...prev, { id: newId, x1: sortedX1, x2: sortedX2, axisDeg }]);
+        qrsBus.add({ id: newId, axisDeg });
+        setActiveQRS(null);
+      }
+    },
+    [activeQRS, getXCoord, leads, dimensions.width]
+  );
+
   // ── Unified Click Handler ─────────────────────────────────────────────────
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -1020,10 +1225,12 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
         handleHRClick(e);
       } else if (tool === 'Measurement') {
         handleRectClick(e);
+      } else if (tool === 'QRSAxis') {
+        handleQRSClick(e);
       }
       // Other tools: no click behavior
     },
-    [handleQTClick, handleHRClick, handleRectClick]
+    [handleQTClick, handleHRClick, handleRectClick, handleQRSClick]
   );
 
   // ── Mouse Move Handler ────────────────────────────────────────────────────
@@ -1038,9 +1245,12 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
       } else if (tool === 'Measurement' && activeRect) {
         const pt = getCoords(e);
         setActiveRect(prev => (prev ? { ...prev, cursorX: pt.x, cursorY: pt.y } : null));
+      } else if (tool === 'QRSAxis' && activeQRS) {
+        const x = getXCoord(e);
+        setActiveQRS(prev => (prev ? { ...prev, cursorX: x } : null));
       }
     },
-    [activeQT, activeHR, activeRect, getCoords, getXCoord]
+    [activeQT, activeHR, activeRect, activeQRS, getCoords, getXCoord]
   );
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -1048,6 +1258,7 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
       setActiveQT(null);
       setActiveHR(null);
       setActiveRect(null);
+      setActiveQRS(null);
     }
   }, []);
 
@@ -1111,13 +1322,19 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
         return '📐 Click first corner → click opposite corner to measure time, voltage & BPM';
       return '2/2 — Click opposite corner to complete rectangle measurement';
     }
-    if (tool === 'QRSAxis') return '⟳ QRS Axis — select leads I and aVF';
+    if (tool === 'QRSAxis') {
+      if (!activeQRS) return '⟳ QRS Axis — Click start of QRS complex';
+      return '2/2 — Click end of QRS complex to measure Axis';
+    }
     return '🎯 Select a measurement tool from the toolbar above';
   };
 
   // Get cursor style
   const cursorStyle =
-    activeTool === 'QTPoints' || activeTool === 'Hr' || activeTool === 'Measurement'
+    activeTool === 'QTPoints' ||
+    activeTool === 'Hr' ||
+    activeTool === 'Measurement' ||
+    activeTool === 'QRSAxis'
       ? 'crosshair'
       : 'default';
 
@@ -1158,12 +1375,13 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
           <span style={{ color: '#4facfe', fontSize: 11 }}>
             {leads?.[0]?.samplingFreq || 500} Hz | 25 mm/s | 10 mm/mV
           </span>
-          {(activeQT || activeHR || activeRect) && (
+          {(activeQT || activeHR || activeRect || activeQRS) && (
             <button
               onClick={() => {
                 setActiveQT(null);
                 setActiveHR(null);
                 setActiveRect(null);
+                setActiveQRS(null);
               }}
               style={{
                 background: '#555',
@@ -1180,14 +1398,17 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
           )}
           {(measurements.length > 0 ||
             hrMeasurements.length > 0 ||
-            rectMeasurements.length > 0) && (
+            rectMeasurements.length > 0 ||
+            qrsMeasurements.length > 0) && (
             <button
               onClick={() => {
                 setMeasurements([]);
                 setHrMeasurements([]);
                 setRectMeasurements([]);
+                setQrsMeasurements([]);
                 hrBus.clear();
                 rectBus.clear();
+                qrsBus.clear();
               }}
               style={{
                 background: '#e53935',
@@ -1328,6 +1549,27 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
                 />
               );
             })()}
+
+          {/* ── QRS Axis — completed ── */}
+          {qrsMeasurements.map(m => (
+            <QRSAxisMeasurementShape
+              key={m.id}
+              m={m}
+              svgH={svgH}
+              leads={leads || []}
+              cols={cols}
+              leadW={leadW}
+              leadH={leadH}
+            />
+          ))}
+
+          {/* ── QRS Axis — live preview ── */}
+          {activeQRS && (
+            <ActiveQRSPreview
+              state={activeQRS}
+              svgH={svgH}
+            />
+          )}
 
           {/* ── Measurement Rectangle — completed ── */}
           {rectMeasurements.map(m => (

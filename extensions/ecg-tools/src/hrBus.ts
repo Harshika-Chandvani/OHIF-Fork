@@ -77,3 +77,40 @@ class RectBus {
 }
 
 export const rectBus = new RectBus();
+
+// ─── QRS Axis Bus ─────────────────────────────────────────────────────────────
+
+export type QRSRecord = {
+  id: number;
+  axisDeg: number;
+};
+
+class QRSBus {
+  private _records: QRSRecord[] = [];
+  private _listeners: Array<(records: QRSRecord[]) => void> = [];
+
+  add(record: QRSRecord) {
+    this._records = [...this._records, record];
+    this._listeners.forEach(fn => fn(this._records));
+  }
+
+  clear() {
+    this._records = [];
+    this._listeners.forEach(fn => fn([]));
+  }
+
+  subscribe(fn: (records: QRSRecord[]) => void): () => void {
+    this._listeners.push(fn);
+    fn(this._records);
+    return () => {
+      const idx = this._listeners.indexOf(fn);
+      if (idx !== -1) this._listeners.splice(idx, 1);
+    };
+  }
+
+  get records(): QRSRecord[] {
+    return this._records;
+  }
+}
+
+export const qrsBus = new QRSBus();

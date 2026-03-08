@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ecgToolState } from '../ecgToolState';
-import { hrBus, HRRecord, rectBus, RectRecord } from '../hrBus';
+import { hrBus, HRRecord, rectBus, RectRecord, qrsBus, QRSRecord } from '../hrBus';
 
 // ── Small metric card component ────────────────────────────────────────────────
 function MetricCard({
@@ -108,6 +108,14 @@ const ECGMeasurementsPanel = ({ servicesManager }) => {
   useEffect(() => {
     const unsub = rectBus.subscribe(records => setRectRecords([...records]));
     setRectRecords([...rectBus.records]);
+    return unsub;
+  }, []);
+
+  // Subscribe to QRS Axis measurements
+  const [qrsRecords, setQrsRecords] = useState<QRSRecord[]>([]);
+  useEffect(() => {
+    const unsub = qrsBus.subscribe(records => setQrsRecords([...records]));
+    setQrsRecords([...qrsBus.records]);
     return unsub;
   }, []);
 
@@ -253,6 +261,57 @@ const ECGMeasurementsPanel = ({ servicesManager }) => {
                   {Math.round(r.bpm)} bpm
                 </span>
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── QRS Axis Section ── */}
+      {qrsRecords.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 8,
+            }}
+          >
+            <h3 style={{ fontSize: 13, color: '#ffbb88', margin: 0 }}>⟳ QRS Axis</h3>
+            <button
+              onClick={() => {
+                qrsBus.clear();
+                setQrsRecords([]);
+              }}
+              style={{
+                background: '#e5393533',
+                color: '#ff6666',
+                border: '1px solid #e5393555',
+                padding: '2px 8px',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 10,
+              }}
+            >
+              Clear
+            </button>
+          </div>
+          {qrsRecords.map((r, i) => (
+            <div
+              key={r.id}
+              style={{
+                background: i % 2 === 0 ? '#150d0a' : '#20100a',
+                borderRadius: 4,
+                padding: '5px 8px',
+                marginBottom: 3,
+                fontSize: 11,
+                display: 'flex',
+                justifyContent: 'space-between',
+                border: '1px solid #ff775522',
+              }}
+            >
+              <span style={{ color: '#5a6a8a' }}>Axis #{i + 1}</span>
+              <span style={{ color: '#ffbb88', fontWeight: 'bold' }}>{r.axisDeg.toFixed(2)}°</span>
             </div>
           ))}
         </div>
@@ -534,6 +593,9 @@ const ECGMeasurementsPanel = ({ servicesManager }) => {
         </div>
         <div>
           🎯 <strong>QT:</strong> Q onset → T end → next Q onset
+        </div>
+        <div>
+          ⟳ <strong>QRS Axis:</strong> Click start & end of QRS complex
         </div>
         <div>
           ⌨ <strong>Esc</strong> to cancel any active measurement
