@@ -9,22 +9,19 @@ const defaultLayout = {
   },
 };
 
+/**
+ * The workflow step toolbar buttons for ECG mode.
+ * Must match what onModeEnter registers — using ECGMeasurementDropdown
+ * in the primary section so the ECG-specific tools remain visible.
+ */
 const defaultToolbarButtons = [
   {
     buttonSection: 'primary',
-    buttons: ['MeasurementTools', 'Zoom', 'WindowLevel'],
+    buttons: ['ECGMeasurementDropdown'],
   },
   {
-    buttonSection: 'MeasurementTools',
-    buttons: [
-      'Length',
-      'Bidirectional',
-      'ArrowAnnotate',
-      'EllipticalROI',
-      'RectangleROI',
-      'CircleROI',
-      'Angle',
-    ],
+    buttonSection: 'ECGMeasurementDropdown',
+    buttons: ['ecg-measurement', 'ecg-qt-points', 'ecg-hr', 'ecg-qrs-axis'],
   },
 ];
 

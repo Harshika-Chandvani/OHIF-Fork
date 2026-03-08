@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { DicomMetadataStore } from '@ohif/core';
+import { ecgToolState } from '../ecgToolState';
+import { hrBus } from '../hrBus';
 
 const LEAD_NAMES = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
 
@@ -406,6 +408,165 @@ function ActiveQTPreview({ state }: { state: ActiveQTState }) {
   );
 }
 
+// ─── HR Measurement Types ─────────────────────────────────────────────────────
+
+interface HRMeasurement {
+  id: number;
+  x1: number; // pixel position of first R-peak
+  x2: number; // pixel position of second R-peak
+  rrSec: number;
+  hrBpm: number;
+  svgH: number; // total svg height for spanning lines
+}
+
+interface ActiveHRState {
+  x1: number; // anchor x position
+  cursorX: number;
+}
+
+// ─── Full-height Vertical Ruler Lines for HR tool ─────────────────────────────
+
+/**
+ * Renders 4 vertical lines spanning the full ECG viewport height:
+ *  Line 1: at x1 (anchor click)
+ *  Lines 2-4: evenly spaced between x1 and x2, for interval variance visual
+ *  Shows RR interval (s) and HR (BPM) at the midpoint
+ */
+function HRRulerLines({
+  x1,
+  x2,
+  svgH,
+  rrSec,
+  hrBpm,
+  isDashed = false,
+  opacity = 1,
+}: {
+  x1: number;
+  x2: number;
+  svgH: number;
+  rrSec: number;
+  hrBpm: number;
+  isDashed?: boolean;
+  opacity?: number;
+}) {
+  const midX = (x1 + x2) / 2;
+  const span = x2 - x1;
+  // Four lines: x1, x1+span/3, x1+2*span/3, x2
+  const linePositions = [x1, x1 + span / 3, x1 + (2 * span) / 3, x2];
+  const labelText = `${rrSec.toFixed(2)} s`;
+  const hrText = `HR ${Math.round(hrBpm)}`;
+  const labelWidth = Math.max(labelText.length, hrText.length) * 7.5 + 8;
+
+  return (
+    <g opacity={opacity}>
+      {linePositions.map((lx, i) => (
+        <line
+          key={i}
+          x1={lx}
+          y1={0}
+          x2={lx}
+          y2={svgH}
+          stroke="#5577ff"
+          strokeWidth={i === 0 || i === 3 ? 1.8 : 1.2}
+          strokeDasharray={isDashed ? '5 3' : i === 1 || i === 2 ? '4 4' : 'none'}
+        />
+      ))}
+      {/* Label box at midpoint */}
+      <rect
+        x={midX - labelWidth / 2}
+        y={svgH * 0.33 - 22}
+        width={labelWidth}
+        height={32}
+        rx={4}
+        fill="#0a0e1acc"
+        stroke="#5577ff44"
+        strokeWidth={1}
+      />
+      <text
+        x={midX}
+        y={svgH * 0.33 - 10}
+        textAnchor="middle"
+        fill="#88aaff"
+        fontSize={11}
+        fontFamily="monospace"
+        fontWeight="bold"
+      >
+        {labelText}
+      </text>
+      <text
+        x={midX}
+        y={svgH * 0.33 + 4}
+        textAnchor="middle"
+        fill="#88aaff"
+        fontSize={11}
+        fontFamily="monospace"
+        fontWeight="bold"
+      >
+        {hrText}
+      </text>
+    </g>
+  );
+}
+
+// ─── HR Interval Variance Panel ───────────────────────────────────────────────
+
+interface HRVarianceProps {
+  measurements: HRMeasurement[];
+}
+
+function HRVariancePanel({ measurements }: HRVarianceProps) {
+  if (measurements.length < 2) return null;
+
+  const hrs = measurements.map(m => m.hrBpm);
+  const rrs = measurements.map(m => m.rrSec * 1000); // in ms
+  const avgHR = hrs.reduce((a, b) => a + b, 0) / hrs.length;
+  const avgRR = rrs.reduce((a, b) => a + b, 0) / rrs.length;
+  const maxRR = Math.max(...rrs);
+  const minRR = Math.min(...rrs);
+  const rmssd = Math.sqrt(
+    rrs.slice(1).reduce((acc, rr, i) => acc + Math.pow(rr - rrs[i], 2), 0) / (rrs.length - 1)
+  );
+  const sdnn = Math.sqrt(rrs.reduce((acc, rr) => acc + Math.pow(rr - avgRR, 2), 0) / rrs.length);
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        background: '#0a0e1add',
+        border: '1px solid #5577ff44',
+        borderRadius: 6,
+        padding: '8px 12px',
+        color: '#88aaff',
+        fontFamily: 'monospace',
+        fontSize: 11,
+        zIndex: 10,
+        minWidth: 180,
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ color: '#aaccff', fontWeight: 'bold', marginBottom: 4 }}>
+        HR Interval Variance
+      </div>
+      <div>
+        Avg HR: <span style={{ color: '#fff' }}>{avgHR.toFixed(1)} bpm</span>
+      </div>
+      <div>
+        ΔRR max: <span style={{ color: '#fff' }}>{(maxRR - minRR).toFixed(0)} ms</span>
+      </div>
+      <div>
+        SDNN: <span style={{ color: '#fff' }}>{sdnn.toFixed(1)} ms</span>
+      </div>
+      <div>
+        RMSSD: <span style={{ color: '#fff' }}>{rmssd.toFixed(1)} ms</span>
+      </div>
+      {rmssd > 40 && <div style={{ color: '#66ff99', marginTop: 2 }}>✓ Normal HRV</div>}
+      {rmssd < 20 && <div style={{ color: '#ff8866', marginTop: 2 }}>⚠ Low HRV</div>}
+    </div>
+  );
+}
+
 // ─── Main ECG Waveform Viewport ────────────────────────────────────────────────
 
 let measureId = 0;
@@ -417,9 +578,25 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
   const [loading, setLoading] = useState(true);
   const [measurements, setMeasurements] = useState<QTMeasurement[]>([]);
   const [activeQT, setActiveQT] = useState<ActiveQTState | null>(null);
+  const [hrMeasurements, setHrMeasurements] = useState<HRMeasurement[]>([]);
+  const [activeHR, setActiveHR] = useState<ActiveHRState | null>(null);
+  const [activeTool, setActiveTool] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<SVGSVGElement>(null);
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
+
+  // Subscribe to active tool changes from the toolbar
+  useEffect(() => {
+    const unsub = ecgToolState.subscribe(tool => {
+      setActiveTool(tool);
+      // Clear in-progress states when switching tools
+      setActiveQT(null);
+      setActiveHR(null);
+    });
+    // Initialize with current tool
+    setActiveTool(ecgToolState.getActiveTool());
+    return unsub;
+  }, []);
 
   // Resize observer
   useEffect(() => {
@@ -485,20 +662,24 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }, []);
 
-  // 3-click state machine — always active (no toolbar gate needed)
-  const handleClick = useCallback(
+  // Get only x from mouse event (for HR which is column-spanning)
+  const getXCoord = useCallback((e: React.MouseEvent) => {
+    const rect = overlayRef.current?.getBoundingClientRect();
+    if (!rect) return 0;
+    return e.clientX - rect.left;
+  }, []);
+
+  // ── QT Click Handler ──────────────────────────────────────────────────────
+  const handleQTClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
       const pt = getCoords(e);
 
       if (!activeQT) {
-        // Step 1: place Q1
         setActiveQT({ step: 2, q1: pt, cursor: pt });
       } else if (activeQT.step === 2) {
-        // Step 2: place T
         setActiveQT({ step: 3, q1: activeQT.q1, t: pt, cursor: pt });
       } else if (activeQT.step === 3) {
-        // Step 3: place Q2 → complete measurement
         const q1 = activeQT.q1!;
         const t = activeQT.t!;
         const q2 = pt;
@@ -524,16 +705,75 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
     [activeQT, getCoords, pixelToSec]
   );
 
+  // ── HR Click Handler ──────────────────────────────────────────────────────
+  const handleHRClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 0) return;
+      const x = getXCoord(e);
+
+      if (!activeHR) {
+        // First click: plant anchor line
+        setActiveHR({ x1: x, cursorX: x });
+      } else {
+        // Second click: finalize measurement
+        const x1 = activeHR.x1;
+        const x2 = x;
+        const rrSec = pixelToSec(Math.abs(x2 - x1));
+        const hrBpm = rrSec > 0 ? 60 / rrSec : 0;
+        const newId = ++measureId;
+
+        setHrMeasurements(prev => [
+          ...prev,
+          {
+            id: newId,
+            x1: Math.min(x1, x2),
+            x2: Math.max(x1, x2),
+            rrSec,
+            hrBpm,
+            svgH: 0, // will use from render context
+          },
+        ]);
+        // Notify side panel
+        hrBus.add({ id: newId, rrSec, hrBpm });
+        setActiveHR(null);
+      }
+    },
+    [activeHR, getXCoord, pixelToSec]
+  );
+
+  // ── Unified Click Handler ─────────────────────────────────────────────────
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      const tool = ecgToolState.getActiveTool();
+      if (tool === 'QTPoints') {
+        handleQTClick(e);
+      } else if (tool === 'Hr') {
+        handleHRClick(e);
+      }
+      // Other tools: no click behavior
+    },
+    [handleQTClick, handleHRClick]
+  );
+
+  // ── Mouse Move Handler ────────────────────────────────────────────────────
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
-      if (!activeQT) return;
-      setActiveQT(prev => (prev ? { ...prev, cursor: getCoords(e) } : null));
+      const tool = ecgToolState.getActiveTool();
+      if (tool === 'QTPoints' && activeQT) {
+        setActiveQT(prev => (prev ? { ...prev, cursor: getCoords(e) } : null));
+      } else if (tool === 'Hr' && activeHR) {
+        const x = getXCoord(e);
+        setActiveHR(prev => (prev ? { ...prev, cursorX: x } : null));
+      }
     },
-    [activeQT, getCoords]
+    [activeQT, activeHR, getCoords, getXCoord]
   );
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') setActiveQT(null);
+    if (e.key === 'Escape') {
+      setActiveQT(null);
+      setActiveHR(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -579,12 +819,25 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
   const leadW = width / cols;
   const leadH = svgH / rows;
 
-  // Step hint based on measurement progress
-  const stepHint = !activeQT
-    ? '🎯 Click Q onset (QRS start) → T end → next Q onset  ·  RR / QT / QTc'
-    : activeQT.step === 2
-      ? '2/3 — Click T point (end of T wave)'
-      : '3/3 — Click next Q onset (next beat)';
+  // Step hint
+  const getStepHint = () => {
+    const tool = activeTool;
+    if (tool === 'QTPoints') {
+      if (!activeQT) return '🎯 Click Q onset (QRS start) → T end → next Q onset  ·  RR / QT / QTc';
+      if (activeQT.step === 2) return '2/3 — Click T point (end of T wave)';
+      return '3/3 — Click next Q onset (next beat)';
+    }
+    if (tool === 'Hr') {
+      if (!activeHR) return '❤ Click 1st R-peak → then click 2nd R-peak  ·  Measures RR & HR';
+      return '2/2 — Click 2nd R-peak to complete HR measurement';
+    }
+    if (tool === 'Measurement') return '📏 Select and measure time/voltage intervals';
+    if (tool === 'QRSAxis') return '⟳ QRS Axis — select leads I and aVF';
+    return '🎯 Select a measurement tool from the toolbar above';
+  };
+
+  // Get cursor style
+  const cursorStyle = activeTool === 'QTPoints' || activeTool === 'Hr' ? 'crosshair' : 'default';
 
   return (
     <div
@@ -617,15 +870,18 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
           ECG Waveform — {displaySet?.SeriesDescription || '12-Lead ECG'}
         </span>
         <span style={{ color: '#5bc8f5', fontSize: 11, flex: 1, textAlign: 'center' }}>
-          🎯 {stepHint}
+          {getStepHint()}
         </span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ color: '#4facfe', fontSize: 11 }}>
             {leads?.[0]?.samplingFreq || 500} Hz | 25 mm/s | 10 mm/mV
           </span>
-          {activeQT && (
+          {(activeQT || activeHR) && (
             <button
-              onClick={() => setActiveQT(null)}
+              onClick={() => {
+                setActiveQT(null);
+                setActiveHR(null);
+              }}
               style={{
                 background: '#555',
                 color: '#fff',
@@ -639,9 +895,13 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
               Cancel (Esc)
             </button>
           )}
-          {measurements.length > 0 && (
+          {(measurements.length > 0 || hrMeasurements.length > 0) && (
             <button
-              onClick={() => setMeasurements([])}
+              onClick={() => {
+                setMeasurements([]);
+                setHrMeasurements([]);
+                hrBus.clear();
+              }}
               style={{
                 background: '#e53935',
                 color: '#fff',
@@ -722,7 +982,7 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
           })}
         </svg>
 
-        {/* Interactive overlay — captures clicks */}
+        {/* Interactive overlay — captures clicks, shows measurements */}
         <svg
           ref={overlayRef}
           width={width}
@@ -731,22 +991,60 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
             position: 'absolute',
             top: 0,
             left: 0,
-            cursor: 'crosshair',
+            cursor: cursorStyle,
             pointerEvents: 'all',
           }}
           onClick={handleClick}
           onMouseMove={handleMouseMove}
         >
-          {/* Completed measurements */}
+          {/* ── QT Completed measurements ── */}
           {measurements.map(m => (
             <QTMeasurementShape
               key={m.id}
               m={m}
             />
           ))}
-          {/* Active in-progress measurement */}
+          {/* ── QT Active in-progress measurement ── */}
           {activeQT && <ActiveQTPreview state={activeQT} />}
+
+          {/* ── HR Completed measurements ── */}
+          {hrMeasurements.map(m => (
+            <HRRulerLines
+              key={m.id}
+              x1={m.x1}
+              x2={m.x2}
+              svgH={svgH}
+              rrSec={m.rrSec}
+              hrBpm={m.hrBpm}
+            />
+          ))}
+
+          {/* ── HR In-progress measurement (live preview) ── */}
+          {activeHR &&
+            (() => {
+              const x1 = activeHR.x1;
+              const x2 = activeHR.cursorX;
+              const dxPx = Math.abs(x2 - x1);
+              const rrSec = pixelToSec(dxPx);
+              const hrBpm = rrSec > 0.1 ? 60 / rrSec : 0;
+              const sortedX1 = Math.min(x1, x2);
+              const sortedX2 = Math.max(x1, x2);
+              return (
+                <HRRulerLines
+                  x1={sortedX1}
+                  x2={sortedX2}
+                  svgH={svgH}
+                  rrSec={rrSec}
+                  hrBpm={hrBpm}
+                  isDashed={true}
+                  opacity={0.75}
+                />
+              );
+            })()}
         </svg>
+
+        {/* HR Interval Variance Panel (top-right overlay) */}
+        {hrMeasurements.length >= 2 && <HRVariancePanel measurements={hrMeasurements} />}
       </div>
     </div>
   );
