@@ -1,0 +1,31 @@
+{
+  "name": "@ohif/extension-ecg-tools",
+  "version": "3.13.0-beta.25",
+  "description": "ECG cardiac measurements and analysis tools",
+  "author": "OHIF Core Team",
+  "license": "MIT",
+  "repository": "OHIF/Viewers",
+  "main": "dist/ohif-extension-ecg-tools.umd.js",
+  "module": "src/index.tsx",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "ohif-extension",
+    "ecg",
+    "cardiac"
+  ],
+  "scripts": {
+    "build": "cross-env NODE_ENV=production webpack --config .webpack/webpack.prod.js",
+    "dev": "cross-env NODE_ENV=development webpack --config .webpack/webpack.dev.js --watch --output-pathinfo"
+  },
+  "peerDependencies": {
+    "@ohif/core": "3.13.0-beta.25",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

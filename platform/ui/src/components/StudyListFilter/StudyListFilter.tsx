@@ -39,7 +39,7 @@ const StudyListFilter = ({
                   variant="h6"
                   className="text-white"
                 >
-                  {t('StudyList')}
+                  {t('StudyList 1')}
                 </Typography>
                 {getDataSourceConfigurationComponent && getDataSourceConfigurationComponent()}
                 {onUploadClick && (

@@ -679,7 +679,9 @@ export default class ToolbarService extends PubSubService {
     }
 
     toolbarButtons.forEach(button => {
-      this.handleEvaluate(button.componentProps);
+      if (button && button.componentProps) {
+        this.handleEvaluate(button.componentProps);
+      }
     });
   };
 

@@ -483,6 +483,11 @@ function WorkList({
 
   const menuOptions = [
     {
+      title: 'Load Local File',
+      icon: 'launch-arrow',
+      onClick: () => navigate('/local'),
+    },
+    {
       title: AboutModal?.menuTitle ?? t('Header:About'),
       icon: 'info',
       onClick: () =>

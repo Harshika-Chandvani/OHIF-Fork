@@ -15,7 +15,7 @@ const { structuredCloneWithFunctions } = utils;
  * This list used to include SM, for whole slide imaging, but this is now supported
  * by cornerstone.  Others of these may get added.
  */
-export const NON_IMAGE_MODALITIES = ['ECG', 'SEG', 'RTSTRUCT', 'RTPLAN', 'PR', 'SR'];
+export const NON_IMAGE_MODALITIES = ['SEG', 'RTSTRUCT', 'RTPLAN', 'PR', 'SR'];
 
 export const ohif = {
   layout: '@ohif/extension-default.layoutTemplateModule.viewerLayout',
@@ -82,6 +82,7 @@ export const extensionDependencies = {
   '@ohif/extension-cornerstone-dicom-rt': '^3.0.0',
   '@ohif/extension-dicom-pdf': '^3.0.1',
   '@ohif/extension-dicom-video': '^3.0.1',
+  '@ohif/extension-ecg-tools': '^3.0.0',
 };
 
 export const sopClassHandlers = [
@@ -276,10 +277,14 @@ export const toolbarSections = {
   ],
 };
 
+export const ecgTools = {
+  ecgPanel: 'extension-ecg-tools.panelModule.ecg-measurements',
+};
+
 export const basicLayout = {
   id: ohif.layout,
   props: {
-    leftPanels: [ohif.thumbnailList],
+    leftPanels: [ohif.thumbnailList, ecgTools.ecgPanel],
     leftPanelResizable: true,
     rightPanels: [cornerstone.segmentation, cornerstone.measurements],
     rightPanelClosed: true,
