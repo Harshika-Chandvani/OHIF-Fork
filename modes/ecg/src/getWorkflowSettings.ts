@@ -17,7 +17,7 @@ const defaultLayout = {
 const defaultToolbarButtons = [
   {
     buttonSection: 'primary',
-    buttons: ['ECGMeasurementDropdown'],
+    buttons: ['ECGMeasurementDropdown', 'ecg-zoom-in', 'ecg-zoom-out'],
   },
   {
     buttonSection: 'ECGMeasurementDropdown',

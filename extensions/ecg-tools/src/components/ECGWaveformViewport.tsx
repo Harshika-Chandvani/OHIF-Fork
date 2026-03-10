@@ -996,6 +996,7 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<SVGSVGElement>(null);
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   // Subscribe to active tool changes from the toolbar
   useEffect(() => {
@@ -1008,9 +1009,16 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
       setActiveRect(null);
       setActiveQRS(null);
     });
+    const unsubZoom = ecgToolState.subscribeZoom(level => {
+      setZoomLevel(level);
+    });
     // Initialize with current tool
     setActiveTool(ecgToolState.getActiveTool());
-    return unsub;
+    setZoomLevel(ecgToolState.getZoomLevel());
+    return () => {
+      unsub();
+      unsubZoom();
+    };
   }, []);
 
   // Resize observer
@@ -1087,18 +1095,27 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
   );
 
   // Get SVG coords from mouse event
-  const getCoords = useCallback((e: React.MouseEvent) => {
-    const rect = overlayRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }, []);
+  const getCoords = useCallback(
+    (e: React.MouseEvent) => {
+      const rect = overlayRef.current?.getBoundingClientRect();
+      if (!rect) return { x: 0, y: 0 };
+      return {
+        x: (e.clientX - rect.left) / zoomLevel,
+        y: (e.clientY - rect.top) / zoomLevel,
+      };
+    },
+    [zoomLevel]
+  );
 
   // Get only x from mouse event (for HR which is column-spanning)
-  const getXCoord = useCallback((e: React.MouseEvent) => {
-    const rect = overlayRef.current?.getBoundingClientRect();
-    if (!rect) return 0;
-    return e.clientX - rect.left;
-  }, []);
+  const getXCoord = useCallback(
+    (e: React.MouseEvent) => {
+      const rect = overlayRef.current?.getBoundingClientRect();
+      if (!rect) return 0;
+      return (e.clientX - rect.left) / zoomLevel;
+    },
+    [zoomLevel]
+  );
 
   // ── QT Click Handler ──────────────────────────────────────────────────────
   const handleQTClick = useCallback(
@@ -1497,161 +1514,181 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
 
       {/* Viewport */}
       <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
-        {/* Background waveform (no pointer events) */}
-        <svg
-          width={width}
-          height={svgH}
-          style={{ background: '#0a0e1a', display: 'block', position: 'absolute', top: 0, left: 0 }}
-        >
-          <ECGGrid
-            width={width}
-            height={svgH}
-          />
-          {leads?.map((lead, idx) => {
-            const col = idx % cols;
-            const row = Math.floor(idx / cols);
-            return (
-              <g
-                key={lead.name}
-                transform={`translate(${col * leadW},${row * leadH})`}
+        <div style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
+          <div style={{ width: width * zoomLevel, height: svgH * zoomLevel, position: 'relative' }}>
+            <div
+              style={{
+                transform: `scale(${zoomLevel})`,
+                transformOrigin: '0 0',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+              }}
+            >
+              {/* Background waveform (no pointer events) */}
+              <svg
+                width={width}
+                height={svgH}
+                style={{
+                  background: '#0a0e1a',
+                  display: 'block',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                }}
               >
-                <text
-                  x={6}
-                  y={16}
-                  fill="#4facfe"
-                  fontSize={11}
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                >
-                  {lead.name}
-                </text>
-                <line
-                  x1={0}
-                  y1={leadH}
-                  x2={leadW}
-                  y2={leadH}
-                  stroke="#1e2a4a"
-                  strokeWidth={1}
+                <ECGGrid
+                  width={width}
+                  height={svgH}
                 />
-                <path
-                  d={getWaveformPath(lead.data, leadW, leadH)}
-                  fill="none"
-                  stroke="#00e676"
-                  strokeWidth={1.3}
-                  strokeLinejoin="round"
-                />
-              </g>
-            );
-          })}
-        </svg>
+                {leads?.map((lead, idx) => {
+                  const col = idx % cols;
+                  const row = Math.floor(idx / cols);
+                  return (
+                    <g
+                      key={lead.name}
+                      transform={`translate(${col * leadW},${row * leadH})`}
+                    >
+                      <text
+                        x={6}
+                        y={16}
+                        fill="#4facfe"
+                        fontSize={11}
+                        fontFamily="monospace"
+                        fontWeight="bold"
+                      >
+                        {lead.name}
+                      </text>
+                      <line
+                        x1={0}
+                        y1={leadH}
+                        x2={leadW}
+                        y2={leadH}
+                        stroke="#1e2a4a"
+                        strokeWidth={1}
+                      />
+                      <path
+                        d={getWaveformPath(lead.data, leadW, leadH)}
+                        fill="none"
+                        stroke="#00e676"
+                        strokeWidth={1.3}
+                        strokeLinejoin="round"
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
 
-        {/* Interactive overlay — captures clicks, shows measurements */}
-        <svg
-          ref={overlayRef}
-          width={width}
-          height={svgH}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            cursor: cursorStyle,
-            pointerEvents: 'all',
-          }}
-          onClick={handleClick}
-          onMouseMove={handleMouseMove}
-        >
-          {/* ── QT Completed measurements ── */}
-          {measurements.map(m => (
-            <QTMeasurementShape
-              key={m.id}
-              m={m}
-            />
-          ))}
-          {/* ── QT Active in-progress measurement ── */}
-          {activeQT && <ActiveQTPreview state={activeQT} />}
+              {/* Interactive overlay — captures clicks, shows measurements */}
+              <svg
+                ref={overlayRef}
+                width={width}
+                height={svgH}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  cursor: cursorStyle,
+                  pointerEvents: 'all',
+                }}
+                onClick={handleClick}
+                onMouseMove={handleMouseMove}
+              >
+                {/* ── QT Completed measurements ── */}
+                {measurements.map(m => (
+                  <QTMeasurementShape
+                    key={m.id}
+                    m={m}
+                  />
+                ))}
+                {/* ── QT Active in-progress measurement ── */}
+                {activeQT && <ActiveQTPreview state={activeQT} />}
 
-          {/* ── HR Completed measurements ── */}
-          {hrMeasurements.map(m => (
-            <HRRulerLines
-              key={m.id}
-              x1={m.x1}
-              x2={m.x2}
-              svgH={svgH}
-              rrSec={m.rrSec}
-              hrBpm={m.hrBpm}
-            />
-          ))}
+                {/* ── HR Completed measurements ── */}
+                {hrMeasurements.map(m => (
+                  <HRRulerLines
+                    key={m.id}
+                    x1={m.x1}
+                    x2={m.x2}
+                    svgH={svgH}
+                    rrSec={m.rrSec}
+                    hrBpm={m.hrBpm}
+                  />
+                ))}
 
-          {/* ── HR In-progress measurement (live preview) ── */}
-          {activeHR &&
-            (() => {
-              const x1 = activeHR.x1;
-              const x2 = activeHR.cursorX;
-              const dxPx = Math.abs(x2 - x1);
-              const rrSec = pixelToSec(dxPx);
-              const hrBpm = rrSec > 0.1 ? 60 / rrSec : 0;
-              const sortedX1 = Math.min(x1, x2);
-              const sortedX2 = Math.max(x1, x2);
-              return (
-                <HRRulerLines
-                  x1={sortedX1}
-                  x2={sortedX2}
-                  svgH={svgH}
-                  rrSec={rrSec}
-                  hrBpm={hrBpm}
-                  isDashed={true}
-                  opacity={0.75}
-                />
-              );
-            })()}
+                {/* ── HR In-progress measurement (live preview) ── */}
+                {activeHR &&
+                  (() => {
+                    const x1 = activeHR.x1;
+                    const x2 = activeHR.cursorX;
+                    const dxPx = Math.abs(x2 - x1);
+                    const rrSec = pixelToSec(dxPx);
+                    const hrBpm = rrSec > 0.1 ? 60 / rrSec : 0;
+                    const sortedX1 = Math.min(x1, x2);
+                    const sortedX2 = Math.max(x1, x2);
+                    return (
+                      <HRRulerLines
+                        x1={sortedX1}
+                        x2={sortedX2}
+                        svgH={svgH}
+                        rrSec={rrSec}
+                        hrBpm={hrBpm}
+                        isDashed={true}
+                        opacity={0.75}
+                      />
+                    );
+                  })()}
 
-          {/* ── QRS Axis — completed ── */}
-          {qrsMeasurements.map(m => (
-            <QRSAxisMeasurementShape
-              key={m.id}
-              m={m}
-              svgH={svgH}
-              leads={leads || []}
-              cols={cols}
-              leadW={leadW}
-              leadH={leadH}
-            />
-          ))}
+                {/* ── QRS Axis — completed ── */}
+                {qrsMeasurements.map(m => (
+                  <QRSAxisMeasurementShape
+                    key={m.id}
+                    m={m}
+                    svgH={svgH}
+                    leads={leads || []}
+                    cols={cols}
+                    leadW={leadW}
+                    leadH={leadH}
+                  />
+                ))}
 
-          {/* ── QRS Axis — live preview ── */}
-          {activeQRS && (
-            <ActiveQRSPreview
-              state={activeQRS}
-              svgH={svgH}
-            />
-          )}
+                {/* ── QRS Axis — live preview ── */}
+                {activeQRS && (
+                  <ActiveQRSPreview
+                    state={activeQRS}
+                    svgH={svgH}
+                  />
+                )}
 
-          {/* ── Measurement Rectangle — completed ── */}
-          {rectMeasurements.map(m => (
-            <RectMeasurementShape
-              key={m.id}
-              m={m}
-            />
-          ))}
+                {/* ── Measurement Rectangle — completed ── */}
+                {rectMeasurements.map(m => (
+                  <RectMeasurementShape
+                    key={m.id}
+                    m={m}
+                  />
+                ))}
 
-          {/* ── Measurement Rectangle — live preview ── */}
-          {activeRect &&
-            (() => {
-              const dxPx = Math.abs(activeRect.cursorX - activeRect.x1);
-              const dyPx = Math.abs(activeRect.cursorY - activeRect.y1);
-              const timeSec = pixelToSec(dxPx);
-              const voltMv = pixelToMv(dyPx, svgH);
-              const bpm = timeSec > 0.05 ? 60 / timeSec : 0;
-              return (
-                <ActiveRectPreview
-                  state={activeRect}
-                  timeSec={timeSec}
-                  voltMv={voltMv}
-                  bpm={bpm}
-                />
-              );
-            })()}
-        </svg>
+                {/* ── Measurement Rectangle — live preview ── */}
+                {activeRect &&
+                  (() => {
+                    const dxPx = Math.abs(activeRect.cursorX - activeRect.x1);
+                    const dyPx = Math.abs(activeRect.cursorY - activeRect.y1);
+                    const timeSec = pixelToSec(dxPx);
+                    const voltMv = pixelToMv(dyPx, svgH);
+                    const bpm = timeSec > 0.05 ? 60 / timeSec : 0;
+                    return (
+                      <ActiveRectPreview
+                        state={activeRect}
+                        timeSec={timeSec}
+                        voltMv={voltMv}
+                        bpm={bpm}
+                      />
+                    );
+                  })()}
+              </svg>
+            </div>
+          </div>
+        </div>
 
         {/* HR Interval Variance Panel (top-right overlay) */}
         {hrMeasurements.length >= 2 && <HRVariancePanel measurements={hrMeasurements} />}

@@ -9,6 +9,9 @@ type ECGTool = 'QTPoints' | 'Measurement' | 'Hr' | 'QRSAxis' | null;
 let _activeTool: ECGTool = null;
 const _listeners: Array<(tool: ECGTool) => void> = [];
 
+let _zoomLevel: number = 1;
+const _zoomListeners: Array<(level: number) => void> = [];
+
 export const ecgToolState = {
   getActiveTool(): ECGTool {
     return _activeTool;
@@ -25,6 +28,23 @@ export const ecgToolState = {
     return () => {
       const idx = _listeners.indexOf(listener);
       if (idx !== -1) _listeners.splice(idx, 1);
+    };
+  },
+
+  getZoomLevel(): number {
+    return _zoomLevel;
+  },
+
+  setZoomLevel(level: number) {
+    _zoomLevel = Math.max(0.5, Math.min(level, 10)); // Limit zoom between 0.5x and 10x
+    _zoomListeners.forEach(fn => fn(_zoomLevel));
+  },
+
+  subscribeZoom(listener: (level: number) => void) {
+    _zoomListeners.push(listener);
+    return () => {
+      const idx = _zoomListeners.indexOf(listener);
+      if (idx !== -1) _zoomListeners.splice(idx, 1);
     };
   },
 };

@@ -35,7 +35,7 @@ export const ecgTools = {
 export const NON_IMAGE_MODALITIES = ['SEG', 'RTSTRUCT', 'RTPLAN', 'PR', 'SR'];
 
 export const toolbarSections = {
-  [TOOLBAR_SECTIONS.primary]: ['ECGMeasurementDropdown'],
+  [TOOLBAR_SECTIONS.primary]: ['ECGMeasurementDropdown', 'ecg-zoom-in', 'ecg-zoom-out'],
   [TOOLBAR_SECTIONS.viewportActionMenu.topLeft]: ['orientationMenu', 'dataOverlayMenu'],
   [TOOLBAR_SECTIONS.viewportActionMenu.bottomMiddle]: ['windowLevelMenuEmbedded'],
   ECGMeasurementDropdown: ['ecg-measurement', 'ecg-qt-points', 'ecg-hr', 'ecg-qrs-axis'],
@@ -104,7 +104,11 @@ export function onModeEnter({ servicesManager, extensionManager, commandsManager
   toolbarService.register(toolbarButtons as any);
 
   // Set the primary toolbar and the nested ECGMeasurementDropdown contents
-  toolbarService.updateSection(TOOLBAR_SECTIONS.primary, ['ECGMeasurementDropdown']);
+  toolbarService.updateSection(TOOLBAR_SECTIONS.primary, [
+    'ECGMeasurementDropdown',
+    'ecg-zoom-in',
+    'ecg-zoom-out',
+  ]);
   toolbarService.updateSection('ECGMeasurementDropdown', [
     'ecg-measurement',
     'ecg-qt-points',

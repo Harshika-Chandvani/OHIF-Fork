@@ -71,6 +71,34 @@ const toolbarButtons = [
       evaluate: 'evaluate.action',
     },
   },
+  {
+    id: 'ecg-zoom-in',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-magnify',
+      label: 'Zoom In',
+      tooltip: 'Zoom In ECG Waveform',
+      commands: {
+        commandName: 'zoomInECG',
+        context: 'VIEWER',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'ecg-zoom-out',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-zoom',
+      label: 'Zoom Out',
+      tooltip: 'Zoom Out ECG Waveform',
+      commands: {
+        commandName: 'zoomOutECG',
+        context: 'VIEWER',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
 ];
 
 export default toolbarButtons;

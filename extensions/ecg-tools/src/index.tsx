@@ -14,6 +14,18 @@ function getCommandsModule() {
           ecgToolState.setActiveTool(current === toolName ? null : toolName);
         },
       },
+      zoomInECG: {
+        commandFn: () => {
+          const current = ecgToolState.getZoomLevel();
+          ecgToolState.setZoomLevel(current + 0.25);
+        },
+      },
+      zoomOutECG: {
+        commandFn: () => {
+          const current = ecgToolState.getZoomLevel();
+          ecgToolState.setZoomLevel(current - 0.25);
+        },
+      },
     },
     actions: {},
     defaultContext: 'VIEWER',
@@ -53,6 +65,20 @@ function getToolbarModule() {
       evaluate: () => {
         const isActive = ecgToolState.getActiveTool() === 'QRSAxis';
         return { isActive };
+      },
+    },
+    {
+      name: 'ecg-zoom-in',
+      defaultState: false,
+      evaluate: () => {
+        return { isActive: false };
+      },
+    },
+    {
+      name: 'ecg-zoom-out',
+      defaultState: false,
+      evaluate: () => {
+        return { isActive: false };
       },
     },
   ];
