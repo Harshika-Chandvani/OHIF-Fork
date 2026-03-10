@@ -75,10 +75,18 @@ export const ecgRoute = {
 };
 
 export function isValidMode({ modalities }) {
-  // ECG mode is always valid
+  const modalities_list = typeof modalities === 'string' ? modalities.split('\\') : modalities;
+
+  if (modalities_list.includes('ECG')) {
+    return {
+      valid: true,
+      description: 'ECG Mode',
+    };
+  }
+
   return {
-    valid: true,
-    description: 'ECG Mode',
+    valid: false,
+    description: 'ECG mode only supports studies with the ECG modality',
   };
 }
 
