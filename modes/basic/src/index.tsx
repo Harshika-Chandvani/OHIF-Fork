@@ -47,6 +47,10 @@ export const dicomvideo = {
   viewport: '@ohif/extension-dicom-video.viewportModule.dicom-video',
 };
 
+export const dicomecg = {
+  sopClassHandler: '@ohif/extension-cornerstone.sopClassHandlerModule.DicomEcgSopClassHandler',
+};
+
 export const dicompdf = {
   sopClassHandler: '@ohif/extension-dicom-pdf.sopClassHandlerModule.dicom-pdf',
   viewport: '@ohif/extension-dicom-pdf.viewportModule.dicom-pdf',
@@ -87,6 +91,7 @@ export const extensionDependencies = {
 
 export const sopClassHandlers = [
   dicomvideo.sopClassHandler,
+  dicomecg.sopClassHandler,
   dicomSeg.sopClassHandler,
   dicomPmap.sopClassHandler,
   ohif.sopClassHandler,
@@ -296,6 +301,7 @@ export const basicLayout = {
           ohif.sopClassHandler,
           dicomvideo.sopClassHandler,
           ohif.wsiSopClassHandler,
+          dicomecg.sopClassHandler,
         ],
       },
       {
