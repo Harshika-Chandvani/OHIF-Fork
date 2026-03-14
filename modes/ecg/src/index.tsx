@@ -35,10 +35,18 @@ export const ecgTools = {
 export const NON_IMAGE_MODALITIES = ['SEG', 'RTSTRUCT', 'RTPLAN', 'PR', 'SR'];
 
 export const toolbarSections = {
-  [TOOLBAR_SECTIONS.primary]: ['ECGMeasurementDropdown', 'ecg-zoom-in', 'ecg-zoom-out'],
+  [TOOLBAR_SECTIONS.primary]: ['ECGMeasurementDropdown', 'ECGLayoutDropdown', 'ecg-zoom-in', 'ecg-zoom-out', 'ecg-import', 'ecg-delete'],
   [TOOLBAR_SECTIONS.viewportActionMenu.topLeft]: ['orientationMenu', 'dataOverlayMenu'],
   [TOOLBAR_SECTIONS.viewportActionMenu.bottomMiddle]: ['windowLevelMenuEmbedded'],
   ECGMeasurementDropdown: ['ecg-measurement', 'ecg-qt-points', 'ecg-hr', 'ecg-qrs-axis'],
+  ECGLayoutDropdown: [
+    'ecg-layout-1x1',
+    'ecg-layout-1x2',
+    'ecg-layout-1x3',
+    'ecg-layout-2x1',
+    'ecg-layout-2x2',
+    'ecg-layout-2x3',
+  ],
 };
 
 export const ecgLayout = {
@@ -114,14 +122,25 @@ export function onModeEnter({ servicesManager, extensionManager, commandsManager
   // Set the primary toolbar and the nested ECGMeasurementDropdown contents
   toolbarService.updateSection(TOOLBAR_SECTIONS.primary, [
     'ECGMeasurementDropdown',
+    'ECGLayoutDropdown',
     'ecg-zoom-in',
     'ecg-zoom-out',
+    'ecg-import',
+    'ecg-delete',
   ]);
   toolbarService.updateSection('ECGMeasurementDropdown', [
     'ecg-measurement',
     'ecg-qt-points',
     'ecg-hr',
     'ecg-qrs-axis',
+  ]);
+  toolbarService.updateSection('ECGLayoutDropdown', [
+    'ecg-layout-1x1',
+    'ecg-layout-1x2',
+    'ecg-layout-1x3',
+    'ecg-layout-2x1',
+    'ecg-layout-2x2',
+    'ecg-layout-2x3',
   ]);
 }
 
@@ -130,11 +149,14 @@ export function onSetupRouteComplete({ servicesManager }: withAppTypes) {
   initWorkflowSteps({ servicesManager });
 }
 
-export function onModeExit({ servicesManager }: withAppTypes) {
+export function onModeExit({ servicesManager, commandsManager }: withAppTypes) {
   const { toolGroupService, cornerstoneViewportService } = servicesManager.services;
 
   toolGroupService.destroy();
   cornerstoneViewportService.destroy();
+
+  // Reset ECG-specific state via command
+  commandsManager.runCommand('resetECGState');
 }
 
 export const modeInstance = {

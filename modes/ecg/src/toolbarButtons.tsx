@@ -99,6 +99,132 @@ const toolbarButtons = [
       evaluate: 'evaluate.action',
     },
   },
+  {
+    id: 'ECGLayoutDropdown',
+    uiType: 'ohif.toolButtonList',
+    props: {
+      buttonSection: true,
+      label: 'Panels',
+    },
+  },
+  {
+    id: 'ecg-layout-1x1',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-layout',
+      label: '1x1 Panel',
+      tooltip: 'Single viewport layout',
+      commands: {
+        commandName: 'setECGLayout',
+        commandOptions: { numRows: 1, numCols: 1 },
+        context: 'VIEWER',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'ecg-layout-1x2',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-layout',
+      label: '1x2 Panel',
+      tooltip: '1 row, 2 columns layout',
+      commands: {
+        commandName: 'setECGLayout',
+        commandOptions: { numRows: 1, numCols: 2 },
+        context: 'VIEWER',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'ecg-layout-1x3',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-layout',
+      label: '1x3 Panel',
+      tooltip: '1 row, 3 columns layout',
+      commands: {
+        commandName: 'setECGLayout',
+        commandOptions: { numRows: 1, numCols: 3 },
+        context: 'VIEWER',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'ecg-layout-2x1',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-layout',
+      label: '2x1 Panel',
+      tooltip: '2 rows, 1 column layout',
+      commands: {
+        commandName: 'setECGLayout',
+        commandOptions: { numRows: 2, numCols: 1 },
+        context: 'VIEWER',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'ecg-layout-2x2',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-layout',
+      label: '2x2 Panel',
+      tooltip: '2 rows, 2 columns layout',
+      commands: {
+        commandName: 'setECGLayout',
+        commandOptions: { numRows: 2, numCols: 2 },
+        context: 'VIEWER',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'ecg-layout-2x3',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-layout',
+      label: '2x3 Panel',
+      tooltip: '2 rows, 3 columns layout',
+      commands: {
+        commandName: 'setECGLayout',
+        commandOptions: { numRows: 2, numCols: 3 },
+        context: 'VIEWER',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'ecg-import',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'Upload',
+      label: 'Import',
+      tooltip: 'Import local ECG DICOM file for comparison',
+      commands: {
+        commandName: 'importECG',
+        context: 'VIEWER',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'ecg-delete',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'Trash',
+      label: 'Delete',
+      tooltip: 'Delete the active local ECG study',
+      commands: {
+        commandName: 'deleteActiveECG',
+        context: 'VIEWER',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
 ];
 
 export default toolbarButtons;

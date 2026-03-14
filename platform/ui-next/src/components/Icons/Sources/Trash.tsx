@@ -4,6 +4,8 @@ import type { IconProps } from '../types';
 export const Trash = (props: IconProps) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
+    width="24px"
+    height="24px"
     viewBox="0 0 448 512"
     aria-labelledby="title"
     fill="currentColor"

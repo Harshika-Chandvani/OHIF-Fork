@@ -119,6 +119,18 @@ const ECGMeasurementsPanel = ({ servicesManager }) => {
     return unsub;
   }, []);
 
+  const [comparisonMode, setComparisonMode] = useState(false);
+  useEffect(() => {
+    const unsub = ecgToolState.subscribeComparison(mode => setComparisonMode(mode));
+    setComparisonMode(ecgToolState.getComparisonMode());
+    return unsub;
+  }, []);
+
+  // Get active display sets for comparison info
+  const { displaySetService } = servicesManager.services;
+  const activeDisplaySets = displaySetService.getActiveDisplaySets();
+  const ecgDisplaySets = activeDisplaySets.filter(ds => ds.Modality === 'ECG');
+
   // ── HR Variance calculations ──────────────────────────────────────────────
   const hrValues = hrRecords.map(r => r.hrBpm);
   const rrValues = hrRecords.map(r => r.rrSec * 1000); // ms
@@ -569,6 +581,69 @@ const ECGMeasurementsPanel = ({ servicesManager }) => {
                 Clear Baseline
               </button>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Study Comparison Section ── */}
+      {comparisonMode && (
+        <div
+          style={{
+            background: '#0d1525',
+            border: '1px solid #4facfe44',
+            borderRadius: 8,
+            padding: 10,
+            marginBottom: 16,
+          }}
+        >
+          <h3 style={{ fontSize: 13, color: '#4facfe', marginBottom: 10 }}>📖 Study Comparison</h3>
+
+          {ecgDisplaySets.length < 2 ? (
+            <div style={{ color: '#5a6a8a', fontSize: 11 }}>
+              Side-by-side mode active. Select another ECG series from the list to compare.
+            </div>
+          ) : (
+            <>
+              {ecgDisplaySets.slice(0, 2).map((ds, idx) => (
+                <div
+                  key={ds.displaySetInstanceUID}
+                  style={{
+                    background: '#10152a',
+                    padding: '8px',
+                    borderRadius: 4,
+                    marginBottom: 6,
+                    borderLeft: `3px solid ${idx === 0 ? '#4facfe' : '#00e676'}`,
+                  }}
+                >
+                  <div style={{ fontSize: 10, color: idx === 0 ? '#4facfe' : '#00e676', fontWeight: 'bold' }}>
+                    {idx === 0 ? 'LEFT VIEWPORT (Baseline)' : 'RIGHT VIEWPORT (Comparison)'}
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 'bold', marginTop: 2 }}>
+                    {ds.SeriesDescription || 'ECG Waveform'}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#5a6a8a', marginTop: 2 }}>
+                    {ds.SeriesDate ? `Date: ${ds.SeriesDate}` : 'No Date'}
+                  </div>
+                </div>
+              ))}
+
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: '8px',
+                  background: '#0a2a0a',
+                  color: '#66ff99',
+                  borderRadius: 4,
+                  fontSize: 11,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <span style={{ fontSize: 14 }}>✓</span>
+                <span>Synchronized viewports active</span>
+              </div>
+            </>
           )}
         </div>
       )}

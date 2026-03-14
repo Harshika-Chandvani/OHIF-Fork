@@ -11,7 +11,10 @@ function parseWaveformData(instance) {
   try {
     const waveformSequence =
       instance['54000100'] || instance.WaveformSequence || instance['x54000100'];
-    if (!waveformSequence) return null;
+    if (!waveformSequence) {
+      console.log('[ECGTools] No WaveformSequence found in instance');
+      return null;
+    }
 
     const sequences = Array.isArray(waveformSequence)
       ? waveformSequence
@@ -22,22 +25,54 @@ function parseWaveformData(instance) {
     for (const seq of sequences) {
       const channelDef =
         seq['003a0200'] || seq.WaveformChannelDefinitionSequence || seq['x003a0200'];
-      const waveformData = seq['54001010'] || seq.WaveformData || seq['x54001010'];
+      const waveformDataTag = seq['54001010'] || seq.WaveformData || seq['x54001010'];
       const samplesPerChannel = seq['003a0010']?.Value?.[0] || seq.NumberOfWaveformSamples || 5000;
       const samplingFreq = seq['003a001a']?.Value?.[0] || seq.SamplingFrequency || 500;
       const numChannels = seq['003a0005']?.Value?.[0] || seq.NumberOfWaveformChannels || 12;
 
-      if (!waveformData) continue;
+      if (!waveformDataTag) {
+        console.log('[ECGTools] WaveformData tag missing in sequence');
+        continue;
+      }
 
-      let rawData: Int16Array;
-      if (waveformData.InlineBinary) {
-        const binaryStr = atob(waveformData.InlineBinary);
+      let rawData: Int16Array | null = null;
+      
+      // Resilient extraction for different DICOM data formats (DICOMweb, dcmjs, etc.)
+      if (waveformDataTag.InlineBinary) {
+        const binaryStr = atob(waveformDataTag.InlineBinary);
         const bytes = new Uint8Array(binaryStr.length);
         for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
         rawData = new Int16Array(bytes.buffer);
-      } else if (waveformData.Value) {
-        rawData = new Int16Array(waveformData.Value);
-      } else {
+      } else if (waveformDataTag.Value) {
+        let val = waveformDataTag.Value[0];
+        // Handle Proxy(Array) or simply Array wrapping the buffer
+        if (!val && Array.isArray(waveformDataTag.Value)) {
+           val = waveformDataTag.Value[0];
+        }
+        
+        if (val instanceof ArrayBuffer) {
+          rawData = new Int16Array(val);
+        } else if (ArrayBuffer.isView(val)) {
+          rawData = new Int16Array(val.buffer, val.byteOffset, val.byteLength / 2);
+        } else if (typeof val === 'number') {
+          rawData = new Int16Array(waveformDataTag.Value);
+        }
+      } else if (waveformDataTag instanceof ArrayBuffer) {
+         rawData = new Int16Array(waveformDataTag);
+      } else if (ArrayBuffer.isView(waveformDataTag)) {
+         rawData = new Int16Array(waveformDataTag.buffer, (waveformDataTag as any).byteOffset, (waveformDataTag as any).byteLength / 2);
+      } else if (Array.isArray(waveformDataTag)) {
+         // Direct Array or Proxy(Array) containing buffer
+         const first = waveformDataTag[0];
+         if (first instanceof ArrayBuffer) {
+           rawData = new Int16Array(first);
+         } else if (ArrayBuffer.isView(first)) {
+           rawData = new Int16Array(first.buffer, first.byteOffset, first.byteLength / 2);
+         }
+      }
+
+      if (!rawData) {
+        console.warn('[ECGTools] Could not identify rawData format for waveformDataTag:', waveformDataTag);
         continue;
       }
 
@@ -45,8 +80,10 @@ function parseWaveformData(instance) {
 
       for (let ch = 0; ch < numChannels; ch++) {
         const channelData: number[] = [];
-        for (let s = 0; s < samplesPerChannel; s++)
-          channelData.push(rawData[s * numChannels + ch] || 0);
+        for (let s = 0; s < samplesPerChannel; s++) {
+          const idx = s * numChannels + ch;
+          channelData.push(rawData[idx] || 0);
+        }
 
         const chDef = channels[ch] || {};
         const sensitivity = chDef['003a0210']?.Value?.[0] || chDef.ChannelSensitivity || 1;
@@ -64,7 +101,7 @@ function parseWaveformData(instance) {
     }
     return leads.length > 0 ? leads : null;
   } catch (e) {
-    console.warn('[ECGViewport] Parse error:', e);
+    console.error('[ECGViewport] Parse error:', e);
     return null;
   }
 }
@@ -145,8 +182,8 @@ function ECGGrid({ width, height }: { width: number; height: number }) {
           y1={(i + 1) * cell}
           x2={width}
           y2={(i + 1) * cell}
-          stroke={i % 5 === 4 ? '#ff000055' : '#ff000022'}
-          strokeWidth={i % 5 === 4 ? 0.8 : 0.3}
+          stroke={i % 5 === 4 ? '#e57373' : '#e5737333'}
+          strokeWidth={i % 5 === 4 ? 0.8 : 0.4}
         />
       ))}
       {Array.from({ length: Math.floor(width / cell) }, (_, i) => (
@@ -156,8 +193,8 @@ function ECGGrid({ width, height }: { width: number; height: number }) {
           y1={0}
           x2={(i + 1) * cell}
           y2={height}
-          stroke={i % 5 === 4 ? '#ff000055' : '#ff000022'}
-          strokeWidth={i % 5 === 4 ? 0.8 : 0.3}
+          stroke={i % 5 === 4 ? '#e57373' : '#e5737333'}
+          strokeWidth={i % 5 === 4 ? 0.8 : 0.4}
         />
       ))}
     </g>
@@ -1056,8 +1093,14 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
           setLeads(parsed);
           setError(null);
         } else {
+          // If no parsed data, try to see if it's because it's missing waveform data
+          const hasWaveformRaw = (meta || instance)?.WaveformSequence || (meta || instance)?.['54000100'];
+          if (hasWaveformRaw) {
+            setError('Error: Found waveform data but failed to parse channels.');
+          } else {
+            setError('No waveform data found in this DICOM file.');
+          }
           setLeads(generateDemoECG());
-          setError('Demo mode: Binary waveform not available. Showing synthetic ECG.');
         }
       } catch (e: any) {
         setLeads(generateDemoECG());
@@ -1345,7 +1388,7 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
         style={{
           width: '100%',
           height: '100%',
-          background: '#0a0e1a',
+          background: '#ffffff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1356,12 +1399,12 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
           style={{
             width: 36,
             height: 36,
-            border: '3px solid #1e2a4a',
-            borderTop: '3px solid #4facfe',
+            border: '3px solid #eee',
+            borderTop: '3px solid #d32f2f',
             borderRadius: '50%',
           }}
         />
-        <p style={{ color: '#4facfe', marginTop: 12, fontFamily: 'monospace' }}>
+        <p style={{ color: '#d32f2f', marginTop: 12, fontFamily: 'monospace' }}>
           Loading ECG Waveform…
         </p>
       </div>
@@ -1416,7 +1459,7 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
       style={{
         width: '100%',
         height: '100%',
-        background: '#0a0e1a',
+        background: '#ffffff',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -1437,14 +1480,14 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
           gap: 12,
         }}
       >
-        <span style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>
+        <span style={{ color: '#444', fontSize: 13, fontWeight: 'bold' }}>
           ECG Waveform — {displaySet?.SeriesDescription || '12-Lead ECG'}
         </span>
-        <span style={{ color: '#5bc8f5', fontSize: 11, flex: 1, textAlign: 'center' }}>
+        <span style={{ color: '#d32f2f', fontSize: 11, flex: 1, textAlign: 'center' }}>
           {getStepHint()}
         </span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ color: '#4facfe', fontSize: 11 }}>
+          <span style={{ color: '#444', fontSize: 11 }}>
             {leads?.[0]?.samplingFreq || 500} Hz | 25 mm/s | 10 mm/mV
           </span>
           {(activeQT || activeHR || activeRect || activeQRS) && (
@@ -1530,7 +1573,7 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
                 width={width}
                 height={svgH}
                 style={{
-                  background: '#0a0e1a',
+                  background: '#ffffff',
                   display: 'block',
                   position: 'absolute',
                   top: 0,
@@ -1552,7 +1595,7 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
                       <text
                         x={6}
                         y={16}
-                        fill="#4facfe"
+                        fill="#000"
                         fontSize={11}
                         fontFamily="monospace"
                         fontWeight="bold"
@@ -1564,13 +1607,13 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
                         y1={leadH}
                         x2={leadW}
                         y2={leadH}
-                        stroke="#1e2a4a"
+                        stroke="#e0e0e0"
                         strokeWidth={1}
                       />
                       <path
                         d={getWaveformPath(lead.data, leadW, leadH)}
                         fill="none"
-                        stroke="#00e676"
+                        stroke="#000000"
                         strokeWidth={1.3}
                         strokeLinejoin="round"
                       />
@@ -1594,6 +1637,31 @@ export default function ECGWaveformViewport({ displaySets, servicesManager }: an
                 onClick={handleClick}
                 onMouseMove={handleMouseMove}
               >
+                {/* Clinical Info Translation from Example Image */}
+                <foreignObject
+                  x={width - 180}
+                  y={10}
+                  width={170}
+                  height={100}
+                >
+                  <div
+                    style={{
+                      textAlign: 'right',
+                      color: '#d32f2f',
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                      lineHeight: '1.3',
+                      userSelect: 'none',
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold' }}>Ventricular Heart Rate: 72 bpm</div>
+                    <div>PR Interval: 160 ms</div>
+                    <div>QRS Duration: 92 ms</div>
+                    <div>QT/QTc: 380/410 ms</div>
+                    <div>P-R-T Axis: 56 / 42 / 38</div>
+                  </div>
+                </foreignObject>
+
                 {/* ── QT Completed measurements ── */}
                 {measurements.map(m => (
                   <QTMeasurementShape

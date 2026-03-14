@@ -300,6 +300,12 @@ const BaseImplementation = {
       _model.studies.push(newStudy);
     }
   },
+  deleteStudy(StudyInstanceUID) {
+    const index = _model.studies.findIndex(study => study.StudyInstanceUID === StudyInstanceUID);
+    if (index !== -1) {
+      _model.studies.splice(index, 1);
+    }
+  },
   getStudyInstanceUIDs: _getStudyInstanceUIDs,
   getStudy: _getStudy,
   getSeries: _getSeries,

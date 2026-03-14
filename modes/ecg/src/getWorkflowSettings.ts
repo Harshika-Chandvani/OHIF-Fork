@@ -17,11 +17,22 @@ const defaultLayout = {
 const defaultToolbarButtons = [
   {
     buttonSection: 'primary',
-    buttons: ['ECGMeasurementDropdown', 'ecg-zoom-in', 'ecg-zoom-out'],
+    buttons: ['ECGMeasurementDropdown', 'ECGLayoutDropdown', 'ecg-zoom-in', 'ecg-zoom-out', 'ecg-import', 'ecg-delete'],
   },
   {
     buttonSection: 'ECGMeasurementDropdown',
     buttons: ['ecg-measurement', 'ecg-qt-points', 'ecg-hr', 'ecg-qrs-axis'],
+  },
+  {
+    buttonSection: 'ECGLayoutDropdown',
+    buttons: [
+      'ecg-layout-1x1',
+      'ecg-layout-1x2',
+      'ecg-layout-1x3',
+      'ecg-layout-2x1',
+      'ecg-layout-2x2',
+      'ecg-layout-2x3',
+    ],
   },
 ];
 
