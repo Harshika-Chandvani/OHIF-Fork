@@ -14,9 +14,10 @@ export function useActiveToolOptions({ buttonSectionId }: UseActiveToolOptionsPr
     buttonSection: buttonSectionId,
   });
 
-  // Helper to check a list of buttons for an active tool.
   const findActiveOptions = (buttons: any[]): unknown => {
     for (const tool of buttons) {
+      if (!tool || !tool.componentProps) continue;
+
       if (tool.componentProps.isActive) {
         return {
           activeToolOptions: tool.componentProps.options,

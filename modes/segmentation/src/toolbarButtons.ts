@@ -559,7 +559,11 @@ export const toolbarButtons: Button[] = [
               value: 'CatmullRomSplineROI',
               label: i18n.t('Buttons:Catmull Rom Spline'),
             },
-            { id: 'LinearSplineROI', value: 'LinearSplineROI', label: i18n.t('Buttons:Linear Spline') },
+            {
+              id: 'LinearSplineROI',
+              value: 'LinearSplineROI',
+              label: i18n.t('Buttons:Linear Spline'),
+            },
             { id: 'BSplineROI', value: 'BSplineROI', label: i18n.t('Buttons:B-Spline') },
           ],
           commands: {
@@ -637,6 +641,90 @@ export const toolbarButtons: Button[] = [
           commands: {
             commandName: 'setDynamicCursorSizeForSculptorTool',
           },
+        },
+      ],
+    },
+  },
+  {
+    id: 'smart-paint',
+    uiType: 'ohif.toolBoxButton',
+    props: {
+      icon: 'icon-tool-brush',
+      label: i18n.t('Buttons:Smart Paint'),
+      tooltip: i18n.t('Buttons:Smart Paint configuration and parameters'),
+      evaluate: [
+        {
+          name: 'evaluate.cornerstone.segmentation',
+          toolNames: ['SmartPaint'],
+          disabledText: i18n.t('Buttons:Create new segmentation to enable this tool.'),
+        },
+        {
+          name: 'evaluate.cornerstone.segmentation.synchronizeDrawingRadius',
+          radiusOptionId: 'smart-paint-radius',
+        },
+      ],
+      commands: [
+        {
+          commandName: 'activateSmartPaintTool',
+        },
+      ],
+      options: [
+        {
+          name: i18n.t('Buttons:Mode'),
+          type: 'radio',
+          id: 'smart-paint-mode',
+          value: '2D',
+          values: [
+            { value: '2D', label: '2D' },
+            { value: '3D', label: '3D' },
+          ],
+          commands: 'setSmartPaintMode',
+        },
+        {
+          name: i18n.t('Buttons:Radius'),
+          id: 'smart-paint-radius',
+          type: 'range',
+          min: 1,
+          max: 50,
+          step: 0.1,
+          value: 15.1,
+          commands: 'setSmartPaintRadius',
+        },
+        {
+          name: i18n.t('Buttons:Sensitivity'),
+          id: 'smart-paint-sensitivity',
+          type: 'range',
+          min: 1,
+          max: 10,
+          step: 1,
+          value: 5,
+          commands: 'setSmartPaintSensitivity',
+        },
+        {
+          name: i18n.t('Buttons:Transparency'),
+          id: 'smart-paint-transparency',
+          type: 'range',
+          min: 0,
+          max: 1,
+          step: 0.1,
+          value: 0.4,
+          commands: 'setSmartPaintTransparency',
+        },
+        {
+          name: i18n.t('Buttons:Undo Last Stroke'),
+          id: 'smart-paint-undo',
+          type: 'button',
+          variant: 'outline',
+          className: 'w-full mb-2',
+          commands: 'undo',
+        },
+        {
+          name: i18n.t('Buttons:Redo Last Stroke'),
+          id: 'smart-paint-redo',
+          type: 'button',
+          variant: 'outline',
+          className: 'w-full',
+          commands: 'redo',
         },
       ],
     },

@@ -43,6 +43,7 @@
     "@ohif/extension-default": "3.13.0-beta.35",
     "@ohif/extension-dicom-pdf": "3.13.0-beta.35",
     "@ohif/extension-dicom-video": "3.13.0-beta.35",
+    "@ohif/extension-smart-paint": "3.13.0-beta.35",
     "@ohif/mode-basic": "3.13.0-beta.35"
   },
   "dependencies": {

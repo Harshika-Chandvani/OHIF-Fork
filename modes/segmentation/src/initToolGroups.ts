@@ -140,6 +140,7 @@ function createTools({ utilityModule, commandsManager }) {
       },
       { toolName: toolNames.LivewireContourSegmentation },
       { toolName: toolNames.SculptorTool },
+      { toolName: 'SmartPaint' },
       { toolName: toolNames.PlanarFreehandROI },
       {
         toolName: 'CatmullRomSplineROI',

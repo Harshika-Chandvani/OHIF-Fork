@@ -111,6 +111,8 @@ function modeFactory({ modeConfiguration }) {
         'SculptorTool',
         'SplineContourSegmentationTool',
         'LivewireContourSegmentationTool',
+        'smart-paint',
+        'measure-perpendicular',
       ]);
 
       toolbarService.updateSection(toolbarService.sections.labelMapSegmentationUtilities, [
@@ -243,7 +245,10 @@ function modeFactory({ modeConfiguration }) {
 const mode = {
   id,
   modeFactory,
-  extensionDependencies,
+  extensionDependencies: {
+    ...extensionDependencies,
+    '@ohif/extension-smart-paint': '^3.0.0',
+  },
 };
 
 export default mode;

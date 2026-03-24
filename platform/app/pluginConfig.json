@@ -74,6 +74,10 @@
     {
       "packageName": "@ohif/extension-ecg-tools",
       "version": "3.0.0"
+    },
+    {
+      "packageName": "@ohif/extension-smart-paint",
+      "version": "3.0.0"
     }
   ],
   "modes": [
