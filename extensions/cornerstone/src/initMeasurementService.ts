@@ -40,6 +40,7 @@ const initMeasurementService = (
     UltrasoundDirectional,
     UltrasoundPleuraBLine,
     SegmentBidirectional,
+    FlatfootMeasurement,
   } = measurementServiceMappingsFactory(
     measurementService,
     displaySetService,
@@ -192,6 +193,14 @@ const initMeasurementService = (
     SegmentBidirectional.matchingCriteria,
     SegmentBidirectional.toAnnotation,
     SegmentBidirectional.toMeasurement
+  );
+
+  measurementService.addMapping(
+    csTools3DVer1MeasurementSource,
+    'FlatfootMeasurement',
+    FlatfootMeasurement.matchingCriteria,
+    FlatfootMeasurement.toAnnotation,
+    FlatfootMeasurement.toMeasurement
   );
 
   return csTools3DVer1MeasurementSource;
@@ -360,7 +369,7 @@ const connectMeasurementServiceToTools = ({
     }
 
     commandsManager.run('startRecordingForAnnotationGroup');
-    for (const measurement of Object.values(measurements)) {
+    for (const measurement of Object.values(measurements) as any[]) {
       const { uid, source } = measurement;
       if (source.name !== CORNERSTONE_3D_TOOLS_SOURCE_NAME) {
         continue;
@@ -449,7 +458,7 @@ const connectMeasurementServiceToTools = ({
 
       if (measurement?.metadata?.referencedImageId) {
         imageId = measurement.metadata.referencedImageId;
-        frameNumber = getSOPInstanceAttributes(measurement.metadata.referencedImageId).frameNumber;
+        frameNumber = getSOPInstanceAttributes(measurement.metadata.referencedImageId, null, null).frameNumber;
       } else if (instance) {
         imageId = dataSource.getImageIdsForInstance({ instance });
       }

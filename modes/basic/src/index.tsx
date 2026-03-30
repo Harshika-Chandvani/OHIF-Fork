@@ -88,6 +88,7 @@ export const extensionDependencies = {
   '@ohif/extension-dicom-video': '^3.0.1',
   '@ohif/extension-ecg-tools': '^3.0.0',
   '@ohif/extension-flatfoot': '^3.0.0',
+  '@ohif/extension-smart-paint': '^3.0.0',
 };
 
 export const sopClassHandlers = [
@@ -153,6 +154,11 @@ export function onModeEnter({
   for (const [key, section] of Object.entries(this.toolbarSections)) {
     toolbarService.updateSection(key, section);
   }
+
+  // Register SmartPaint as a utility button inside the Segmentations side panel
+  toolbarService.updateSection(toolbarService.sections.labelMapSegmentationUtilities, [
+    'SmartPaint',
+  ]);
 
   if (!this.enableSegmentationEdit) {
     customizationService.setCustomizations({
@@ -293,7 +299,7 @@ export const basicLayout = {
   props: {
     leftPanels: [ohif.thumbnailList, ecgTools.ecgPanel],
     leftPanelResizable: true,
-    rightPanels: [cornerstone.segmentation, cornerstone.measurements],
+    rightPanels: [cornerstone.labelMapSegmentationPanel, cornerstone.measurements],
     rightPanelClosed: true,
     rightPanelResizable: true,
     viewports: [

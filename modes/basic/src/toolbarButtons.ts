@@ -573,6 +573,27 @@ const toolbarButtons: Button[] = [
       evaluate: 'evaluate.cornerstoneTool',
     },
   },
+  {
+    id: 'SmartPaint',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-brush',
+      label: 'Smart Paint',
+      tooltip: 'Smart Paint – AI-assisted brush segmentation (auto-creates labelmap)',
+      commands: {
+        commandName: 'activateSmartPaintTool',
+        commandOptions: {},
+        context: 'CORNERSTONE',
+      },
+      evaluate: [
+        'evaluate.action',
+        {
+          name: 'evaluate.viewport.supported',
+          unsupportedViewportTypes: ['video', 'wholeSlide'],
+        },
+      ],
+    },
+  },
   // Window Level
   {
     id: 'WindowLevel',

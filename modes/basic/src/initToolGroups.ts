@@ -82,6 +82,7 @@ function initDefaultToolGroup(extensionManager, toolGroupService, commandsManage
       { toolName: toolNames.SplineROI },
       { toolName: toolNames.LivewireContour },
       { toolName: toolNames.WindowLevelRegion },
+      { toolName: 'SmartPaint' },
     ],
     enabled: [
       { toolName: toolNames.ImageOverlayViewer },
@@ -231,6 +232,7 @@ function initMPRToolGroup(extensionManager, toolGroupService, commandsManager) {
       { toolName: toolNames.SplineROI },
       { toolName: toolNames.LivewireContour },
       { toolName: toolNames.WindowLevelRegion },
+      { toolName: 'SmartPaint' },
       {
         toolName: toolNames.PlanarFreehandContourSegmentation,
         configuration: {

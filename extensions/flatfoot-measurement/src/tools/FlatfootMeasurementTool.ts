@@ -3,11 +3,41 @@ import {
   annotation,
   drawing,
   utilities as csUtils,
+  Enums as CsToolsEnums,
 } from '@cornerstonejs/tools';
-import { getEnabledElement } from '@cornerstonejs/core';
+import { getEnabledElement, eventTarget } from '@cornerstonejs/core';
 import { vec3, vec2 } from 'gl-matrix';
 
 const { drawLine, drawTextBox, drawHandles } = drawing;
+
+/**
+ * Dispatch ANNOTATION_COMPLETED on the cornerstone eventTarget.
+ * This is what CS tools' internal triggerAnnotationCompleted() does.
+ * OHIF's initMeasurementService listens to this event to add/update
+ * the measurement in the side panel.
+ */
+function _triggerAnnotationCompleted(anno: any) {
+  const eventDetail = { annotation: anno };
+  const event = new CustomEvent(CsToolsEnums.Events.ANNOTATION_COMPLETED, {
+    detail: eventDetail,
+    bubbles: false,
+  });
+  eventTarget.dispatchEvent(event);
+}
+
+/**
+ * Dispatch ANNOTATION_MODIFIED on the cornerstone eventTarget.
+ * OHIF's initMeasurementService listens to this to update panel values
+ * when a handle is dragged after the measurement is already registered.
+ */
+function _triggerAnnotationModified(anno: any, viewportId?: string) {
+  const eventDetail = { annotation: anno, viewportId, renderingEngineId: undefined };
+  const event = new CustomEvent(CsToolsEnums.Events.ANNOTATION_MODIFIED, {
+    detail: eventDetail,
+    bubbles: false,
+  });
+  eventTarget.dispatchEvent(event);
+}
 
 // Re-using common enums natively to avoid deep imports
 const Events = {
@@ -98,13 +128,15 @@ class FlatfootMeasurementTool extends AnnotationTool {
         return;
     }
 
-    // Finished
+    // Finished — fire ANNOTATION_COMPLETED so OHIF measurement panel picks it up
     this.angleStartedNotYetCompleted = false;
     data.handles.activeHandleIndex = null;
     this._deactivateModify(element);
     this._deactivateDraw(element);
 
     csUtils.triggerAnnotationRenderForViewportIds(viewportIdsToRender);
+
+    _triggerAnnotationCompleted(anno);
 
     this.editData = null;
     this.isDrawing = false;
@@ -139,12 +171,17 @@ class FlatfootMeasurementTool extends AnnotationTool {
     } else {
         const { currentPoints } = eventDetail;
         const worldPos = currentPoints.world;
-        data.handles.points[handleIndex] = [...worldPos];
+        data.handles.points[handleIndex] = [...worldPos] as [number, number, number];
         anno.invalidated = true;
     }
 
     this.editData.hasMoved = true;
     csUtils.triggerAnnotationRenderForViewportIds(viewportIdsToRender);
+
+    // Notify measurement service of the update (only after 3 points exist)
+    if (data.handles.points.length === 3) {
+      _triggerAnnotationModified(anno, eventDetail.viewportId);
+    }
   };
 
   /**
@@ -314,6 +351,10 @@ class FlatfootMeasurementTool extends AnnotationTool {
         const { points, activeHandleIndex } = data.handles;
 
         if (points.length < 2) continue;
+
+        // Respect the eye icon visibility toggle from the measurements panel
+        if (!annotation.visibility.isAnnotationVisible(annotationUID)) continue;
+
 
         // Convert world to canvas
         const canvasCoordinates = points.map((p: any) => viewport.worldToCanvas(p));
